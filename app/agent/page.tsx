@@ -90,17 +90,24 @@ export default function CaptionStudio() {
   }, [settingsOpen, personaOpen]); // eslint-disable-line
 
   async function identifySingle(url: string): Promise<string> {
-    const apiKey = localStorage.getItem("apiKey");
-    const baseUrl = localStorage.getItem("baseUrl");
-    const visionModel = localStorage.getItem("visionModel");
+    const apiKey = localStorage.getItem("apiKey") || "";
+    const baseUrl = localStorage.getItem("baseUrl") || "";
+    const visionModel = localStorage.getItem("visionModel") || "";
     const visionBaseUrl = localStorage.getItem("visionBaseUrl") || baseUrl;
     const visionApiKey = localStorage.getItem("visionApiKey") || apiKey;
-    if (!visionApiKey || !visionBaseUrl || !visionModel) return "";
+    // 不再卡本地 Key，让服务端环境变量兜底
     try {
       const r = await fetch("/api/vision", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: visionApiKey, baseUrl: visionBaseUrl, model: visionModel, imageBase64: url }),
+        body: JSON.stringify({
+          apiKey: visionApiKey,
+          baseUrl: visionBaseUrl,
+          model: visionModel,
+          visionApiKey,
+          visionBaseUrl,
+          imageBase64: url,
+        }),
       });
       const d = await r.json();
       if (r.ok && d.description) return d.description;
@@ -129,10 +136,10 @@ export default function CaptionStudio() {
   }
 
   async function fetchBgmRecs(desc: string) {
-    const apiKey = localStorage.getItem("apiKey");
-    const baseUrl = localStorage.getItem("baseUrl");
-    const model = localStorage.getItem("model");
-    if (!apiKey || !baseUrl || !model) return;
+    const apiKey = localStorage.getItem("apiKey") || "";
+    const baseUrl = localStorage.getItem("baseUrl") || "";
+    const model = localStorage.getItem("model") || "";
+    // 不再卡本地 Key，让服务端兜底
     setBgmLoading(true);
     try {
       const r = await fetch("/api/quick-bgm", {

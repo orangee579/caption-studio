@@ -33,26 +33,31 @@ function EditorPage() {
 
   // 检查是否配置了 API（服务端环境变量优先，否则看用户 localStorage）
   useEffect(() => {
+    let cancelled = false;
     fetch("/api/config")
       .then((r) => r.json())
       .then((cfg) => {
-        if (cfg.hasServerText && cfg.hasServerVision) {
-          // 服务端已内置 Key，不需要提示
+        if (cancelled) return;
+        // 服务端已配 Key（哪怕只配了一个），都不再显示 banner
+        if (cfg.hasServerText || cfg.hasServerVision) {
           setShowSettingsHint(false);
           return;
         }
-        // 未内置 → 看用户是否配置了
+        // 服务端没配 → 看用户本地是否配置
         const hasKey = !!localStorage.getItem("apiKey");
         const hasModel = !!localStorage.getItem("model");
         const dismissed = localStorage.getItem("hint_dismissed");
         setShowSettingsHint(!hasKey || !hasModel ? !dismissed : false);
       })
       .catch(() => {
+        if (cancelled) return;
+        // 网络异常：才看本地 fallback
         const hasKey = !!localStorage.getItem("apiKey");
         const hasModel = !!localStorage.getItem("model");
         const dismissed = localStorage.getItem("hint_dismissed");
         setShowSettingsHint(!hasKey || !hasModel ? !dismissed : false);
       });
+    return () => { cancelled = true; };
   }, []);
 
   // 初始化：优先应用 AI 文案，没有则恢复草稿

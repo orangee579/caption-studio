@@ -31,12 +31,28 @@ function EditorPage() {
   const [showSettingsHint, setShowSettingsHint] = useState(false);
   const [justApplied, setJustApplied] = useState(false);
 
-  // 检查是否配置了 API
+  // 检查是否配置了 API（服务端环境变量优先，否则看用户 localStorage）
   useEffect(() => {
-    const hasKey = !!localStorage.getItem("apiKey");
-    const hasModel = !!localStorage.getItem("model");
-    const dismissed = localStorage.getItem("hint_dismissed");
-    setShowSettingsHint(!hasKey || !hasModel ? !dismissed : false);
+    fetch("/api/config")
+      .then((r) => r.json())
+      .then((cfg) => {
+        if (cfg.hasServerText && cfg.hasServerVision) {
+          // 服务端已内置 Key，不需要提示
+          setShowSettingsHint(false);
+          return;
+        }
+        // 未内置 → 看用户是否配置了
+        const hasKey = !!localStorage.getItem("apiKey");
+        const hasModel = !!localStorage.getItem("model");
+        const dismissed = localStorage.getItem("hint_dismissed");
+        setShowSettingsHint(!hasKey || !hasModel ? !dismissed : false);
+      })
+      .catch(() => {
+        const hasKey = !!localStorage.getItem("apiKey");
+        const hasModel = !!localStorage.getItem("model");
+        const dismissed = localStorage.getItem("hint_dismissed");
+        setShowSettingsHint(!hasKey || !hasModel ? !dismissed : false);
+      });
   }, []);
 
   // 初始化：优先应用 AI 文案，没有则恢复草稿
@@ -188,33 +204,34 @@ function EditorPage() {
   }
 
   async function fetchAiTitles(imageDataUrl: string) {
-    const apiKey = localStorage.getItem("apiKey");
-    const baseUrl = localStorage.getItem("baseUrl");
-    const visionModel = localStorage.getItem("visionModel");
+    const apiKey = localStorage.getItem("apiKey") || "";
+    const baseUrl = localStorage.getItem("baseUrl") || "";
+    const visionModel = localStorage.getItem("visionModel") || "";
     const visionBaseUrl = localStorage.getItem("visionBaseUrl") || baseUrl;
     const visionApiKey = localStorage.getItem("visionApiKey") || apiKey;
-    const textModel = localStorage.getItem("model");
-
-    if (!apiKey || !baseUrl || !textModel) {
-      setAiTitles(FALLBACK_TITLES.slice(0, 3));
-      return;
-    }
+    const textModel = localStorage.getItem("model") || "";
 
     setAiLoading(true);
     setAiTitles([]);
     try {
+      // 视觉识别（服务端有 Key 就传空，让后端用环境变量）
       let visualDescription = "";
-      if (visionModel && visionBaseUrl && visionApiKey) {
-        const visionResp = await fetch("/api/vision", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ apiKey: visionApiKey, baseUrl: visionBaseUrl, model: visionModel, imageBase64: imageDataUrl }),
-        });
-        const visionData = await visionResp.json();
-        if (visionResp.ok && visionData.description) {
-          visualDescription = visionData.description;
-          sessionStorage.setItem("tt_editor_desc", visualDescription);
-        }
+      const visionResp = await fetch("/api/vision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiKey: visionApiKey,
+          baseUrl: visionBaseUrl,
+          model: visionModel,
+          visionApiKey: visionApiKey,
+          visionBaseUrl: visionBaseUrl,
+          imageBase64: imageDataUrl,
+        }),
+      });
+      const visionData = await visionResp.json();
+      if (visionResp.ok && visionData.description) {
+        visualDescription = visionData.description;
+        sessionStorage.setItem("tt_editor_desc", visualDescription);
       }
       if (!visualDescription) {
         visualDescription = "用户上传了一张视频封面/图片，待识别";

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveKeys, checkRateLimit, getClientIp } from "@/lib/keys";
 
 export const runtime = "edge";
 
@@ -29,9 +30,9 @@ const QUICK_PROMPT = `你是 TikTok 头部账号的文案策划。根据用户�
 5 条标题之间不能有 5 字以上重叠，不能有意思相同的两条。`;
 
 type Body = {
-  apiKey: string;
-  baseUrl: string;
-  model: string;
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
   visual_description: string;
   persona?: {
     nickname?: string;
@@ -61,12 +62,18 @@ export async function POST(req: NextRequest) {
   try { body = await req.json(); } catch {
     return NextResponse.json({ error: "请求体不是合法 JSON" }, { status: 400 });
   }
-  const { apiKey, baseUrl, model, visual_description, persona, user_brief } = body;
-  if (!apiKey || !baseUrl || !model) {
-    return NextResponse.json({ error: "缺少配置" }, { status: 400 });
+  const { text, hasServerKey } = resolveKeys(body);
+  if (!text.apiKey || !text.baseUrl || !text.model) {
+    return NextResponse.json({ error: "未配置 API" }, { status: 400 });
+  }
+  const ip = getClientIp(req);
+  const rl = checkRateLimit(ip, hasServerKey);
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "今日体验次数已用完" }, { status: 429 });
   }
 
-  const url = baseUrl.replace(/\/+$/, "") + "/chat/completions";
+  const { visual_description, persona, user_brief } = body;
+  const url = text.baseUrl.replace(/\/+$/, "") + "/chat/completions";
   const userMsg = [
     `画面描述：\n${visual_description}`,
     personaText(persona) && `\n创作者人设（语气和身份必须对齐）：\n${personaText(persona)}`,
@@ -77,9 +84,9 @@ export async function POST(req: NextRequest) {
   try {
     resp = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${text.apiKey}` },
       body: JSON.stringify({
-        model,
+        model: text.model,
         messages: [
           { role: "system", content: QUICK_PROMPT },
           { role: "user", content: userMsg },

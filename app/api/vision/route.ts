@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { VISION_SYSTEM_PROMPT } from "@/lib/prompt";
+import { resolveKeys, checkRateLimit, getClientIp } from "@/lib/keys";
 
 export const runtime = "edge";
 export const maxDuration = 60;
 
 type Body = {
-  apiKey: string;
-  baseUrl: string;
-  model: string;
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
+  visionApiKey?: string;
+  visionBaseUrl?: string;
   imageBase64: string;
 };
 
@@ -19,27 +22,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "请求体不是合法 JSON" }, { status: 400 });
   }
 
-  const { apiKey, baseUrl, model, imageBase64 } = body;
-  if (!apiKey || !baseUrl || !model) {
-    return NextResponse.json({ error: "缺少 apiKey / baseUrl / model" }, { status: 400 });
+  const { vision, hasServerKey } = resolveKeys(body);
+  if (!vision.apiKey || !vision.baseUrl || !vision.model) {
+    return NextResponse.json({ error: "未配置视觉模型 API" }, { status: 400 });
   }
-  if (!imageBase64 || imageBase64.length < 100) {
+  if (!body.imageBase64 || body.imageBase64.length < 100) {
     return NextResponse.json({ error: "缺少图片数据" }, { status: 400 });
   }
 
-  const url = baseUrl.replace(/\/+$/, "") + "/chat/completions";
-  const dataUrl = imageBase64.startsWith("data:") ? imageBase64 : `data:image/jpeg;base64,${imageBase64}`;
+  // 速率限制（视觉调用更贵，限制更严）
+  const ip = getClientIp(req);
+  const rl = checkRateLimit(ip, hasServerKey);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "今日体验次数已用完，明天再来吧（或在设置里填自己的 Key 解除限制）" },
+      { status: 429 }
+    );
+  }
+
+  const url = vision.baseUrl.replace(/\/+$/, "") + "/chat/completions";
+  const dataUrl = body.imageBase64.startsWith("data:")
+    ? body.imageBase64
+    : `data:image/jpeg;base64,${body.imageBase64}`;
 
   let resp: Response;
   try {
     resp = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${vision.apiKey}` },
       body: JSON.stringify({
-        model,
+        model: vision.model,
         messages: [
           { role: "system", content: VISION_SYSTEM_PROMPT },
           {
@@ -72,5 +84,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "视觉模型未返回描述" }, { status: 502 });
   }
 
-  return NextResponse.json({ description });
+  return NextResponse.json({ description, remaining: rl.remaining });
 }

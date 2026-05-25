@@ -71,13 +71,25 @@ export default function MediaUploader({
   }
 
   async function handleFile(file: File) {
-    const apiKey = localStorage.getItem("apiKey");
-    const baseUrl = localStorage.getItem("baseUrl");
-    const visionModel = localStorage.getItem("visionModel");
+    const apiKey = localStorage.getItem("apiKey") || "";
+    const baseUrl = localStorage.getItem("baseUrl") || "";
+    const visionModel = localStorage.getItem("visionModel") || "";
     const visionBaseUrl = localStorage.getItem("visionBaseUrl") || baseUrl;
     const visionApiKey = localStorage.getItem("visionApiKey") || apiKey;
-    if (!apiKey || !baseUrl) { onToast("先到右上角设置 API"); return; }
-    if (!visionModel) { onToast("请在设置里填视觉模型"); return; }
+
+    // 没本地 Key 时检查服务端是否有 Key
+    if (!apiKey || !visionModel) {
+      try {
+        const cfg = await fetch("/api/config").then((r) => r.json());
+        if (!cfg.hasServerVision) {
+          onToast("先到右上角设置 API");
+          return;
+        }
+      } catch {
+        onToast("先到右上角设置 API");
+        return;
+      }
+    }
 
     setBusy(true);
     try {

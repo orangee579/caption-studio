@@ -161,7 +161,21 @@ export default function CaptionStudio() {
     const baseUrl = localStorage.getItem("baseUrl") || "";
     const model = localStorage.getItem("model") || "";
 
-    if (!apiKey || !baseUrl || !model) { setSettingsOpen(true); return; }
+    // 没本地 Key 时检查服务端是否有 Key
+    if (!apiKey || !baseUrl || !model) {
+      try {
+        const cfg = await fetch("/api/config").then((r) => r.json());
+        if (!cfg.hasServerText) {
+          setSettingsOpen(true);
+          return;
+        }
+        // 服务端有 Key，直接放行
+      } catch {
+        setSettingsOpen(true);
+        return;
+      }
+    }
+
     if (visualDescription.trim().length < 5) {
       setError("缺少画面描述，请回首页上传图片或在下方手动补充");
       return;

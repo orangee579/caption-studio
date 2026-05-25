@@ -212,42 +212,38 @@ button.icon-btn {
 .scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
 .scroll-x::-webkit-scrollbar { display: none; }
 
-/* 深色页面下的滚动条（textarea / 任意可滚容器）*/
-textarea, .card, .scroll-y {
+/* 深色页面下的滚动条（只覆盖 textarea + 显式 .scroll-y，不要污染 .card）*/
+textarea, .scroll-y {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,0.18) transparent;
+  scrollbar-color: rgba(255,255,255,0.10) transparent;
 }
 textarea::-webkit-scrollbar,
-.card::-webkit-scrollbar,
 .scroll-y::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
 }
 textarea::-webkit-scrollbar-track,
-.card::-webkit-scrollbar-track,
 .scroll-y::-webkit-scrollbar-track {
   background: transparent;
 }
 textarea::-webkit-scrollbar-thumb,
-.card::-webkit-scrollbar-thumb,
 .scroll-y::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.10);
   border-radius: 999px;
 }
 textarea::-webkit-scrollbar-thumb:hover,
-.card::-webkit-scrollbar-thumb:hover,
 .scroll-y::-webkit-scrollbar-thumb:hover {
-  background: rgba(255,255,255,0.28);
+  background: rgba(255,255,255,0.20);
 }
 
 /* 浅色页面下用浅色滚动条 */
 [data-theme="light"] textarea,
 [data-theme="light"] .scroll-y {
-  scrollbar-color: rgba(0,0,0,0.2) transparent;
+  scrollbar-color: rgba(0,0,0,0.12) transparent;
 }
 [data-theme="light"] textarea::-webkit-scrollbar-thumb,
 [data-theme="light"] .scroll-y::-webkit-scrollbar-thumb {
-  background: rgba(0,0,0,0.2);
+  background: rgba(0,0,0,0.12);
 }
 
 /* textarea 默认 resize handle（右下角小白角）也藏掉 */
